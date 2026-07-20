@@ -14,12 +14,12 @@ from __future__ import annotations
 from contextlib import AbstractAsyncContextManager
 
 import httpx
-from tai_contract.app import tai_app
-from tai_kit.clients.impl.http import HttpxClient
+from tai42_contract.app import tai42_app
+from tai42_kit.clients.impl.http import HttpxClient
 
-from tai_channel_slack.settings import slack_settings
+from tai42_channel_slack.settings import slack_settings
 
 
 def slack_http() -> AbstractAsyncContextManager[httpx.AsyncClient]:
     """A pooled outbound client budgeted by ``CHANNEL_SLACK_HTTP_TIMEOUT_SECONDS``."""
-    return tai_app.clients.client_ctx(HttpxClient, timeout=slack_settings().http_timeout_seconds)
+    return tai42_app.clients.client_ctx(HttpxClient, timeout=slack_settings().http_timeout_seconds)

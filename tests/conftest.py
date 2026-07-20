@@ -1,10 +1,10 @@
 """Bind a light stub app before the plugin is imported, and provide the shared
 fakes/helpers.
 
-``tai_channel_slack.inbound`` registers its route through
-``@tai_app.http.custom_route`` at import time, ``tai_channel_slack.register``
+``tai42_channel_slack.inbound`` registers its route through
+``@tai42_app.http.custom_route`` at import time, ``tai42_channel_slack.register``
 registers the channel, and every outbound call reaches its client via
-``tai_app.clients.client_ctx``. Binding a stub app here — at collection time,
+``tai42_app.clients.client_ctx``. Binding a stub app here — at collection time,
 before any test module imports the plugin — satisfies all three without
 standing up the real runtime. Tests wire clients per class: an
 ``httpx.AsyncClient`` over a scripted ``MockTransport`` under ``HttpxClient``
@@ -25,11 +25,11 @@ from typing import Any
 import httpx
 import pytest
 from starlette.requests import Request
-from tai_contract.app import tai_app
-from tai_contract.channels import ChannelDelivery
-from tai_kit.clients.impl.http import HttpxClient
-from tai_kit.clients.impl.redis import RedisClient
-from tai_kit.settings import reset_all_settings
+from tai42_contract.app import tai42_app
+from tai42_contract.channels import ChannelDelivery
+from tai42_kit.clients.impl.http import HttpxClient
+from tai42_kit.clients.impl.redis import RedisClient
+from tai42_kit.settings import reset_all_settings
 
 TEST_SIGNING_SECRET = "test-signing-secret"
 TEST_BOT_TOKEN = "xoxb-test-token"
@@ -71,7 +71,7 @@ class _StubClients:
 
 
 class _StubChannels:
-    """Records every channel registered through ``tai_app.channels.register``."""
+    """Records every channel registered through ``tai42_app.channels.register``."""
 
     def __init__(self) -> None:
         self.registered: dict[str, Any] = {}
@@ -85,7 +85,7 @@ class _StubChannels:
 
 
 class _StubHttp:
-    """Records every route registered through ``tai_app.http.custom_route``."""
+    """Records every route registered through ``tai42_app.http.custom_route``."""
 
     def __init__(self) -> None:
         self.routes: dict[str, SimpleNamespace] = {}
@@ -126,7 +126,7 @@ class _StubApp:
 _stub_app = _StubApp()
 # Bind at import time so the first import of any plugin module (its
 # module-level registration side-effects) has an app to register against.
-tai_app.bind(_stub_app)
+tai42_app.bind(_stub_app)
 
 
 class FakeRedis:

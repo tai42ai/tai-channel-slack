@@ -21,12 +21,12 @@ from datetime import UTC, datetime, timedelta
 import httpx
 import pytest
 import redis.asyncio as redis_asyncio
-from tai_contract.channels import ChannelDelivery, ChannelDeliveryError
-from tai_kit.clients.impl.http import HttpxClient
-from tai_kit.clients.impl.redis import RedisClient
-from tai_kit.settings import reset_all_settings
+from tai42_contract.channels import ChannelDelivery, ChannelDeliveryError
+from tai42_kit.clients.impl.http import HttpxClient
+from tai42_kit.clients.impl.redis import RedisClient
+from tai42_kit.settings import reset_all_settings
 
-from tai_channel_slack.channel import SlackChannel
+from tai42_channel_slack.channel import SlackChannel
 
 pytestmark = pytest.mark.integration
 
@@ -66,7 +66,7 @@ async def test_deliver_posts_real_message(live_clients):
     callback_url = f"http://gateway/api/interactions/callback/live-{uuid.uuid4()}"
     delivery = ChannelDelivery(
         interaction_id="live-int",
-        question="[tai-channel-slack integration test] This question expires immediately; do not reply.",
+        question="[tai42-channel-slack integration test] This question expires immediately; do not reply.",
         answer_format="text",
         callback_url=callback_url,
         timeout_at=datetime.now(UTC) + timedelta(minutes=2),
@@ -94,7 +94,7 @@ async def test_ok_false_raises_live(live_clients, monkeypatch):
     reset_all_settings()
     delivery = ChannelDelivery(
         interaction_id="live-int",
-        question="[tai-channel-slack integration test] never delivered",
+        question="[tai42-channel-slack integration test] never delivered",
         answer_format="text",
         callback_url="http://gateway/api/interactions/callback/live-neg",
         timeout_at=datetime.now(UTC) + timedelta(minutes=2),

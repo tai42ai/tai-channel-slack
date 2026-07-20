@@ -2,7 +2,7 @@
 delivery (``deliver``) and fire-and-forget notifications (``notify``).
 
 Delivery contract: failure of ANY step raises
-:class:`~tai_contract.channels.ChannelDeliveryError` — the ask_user helper
+:class:`~tai42_contract.channels.ChannelDeliveryError` — the ask_user helper
 prunes the interaction and re-raises, so an undeliverable question is always a
 loud failure, never a silent drop. Slack reports most send failures as
 HTTP 200 with ``{"ok": false, "error": …}``, so success is decided by the JSON
@@ -25,11 +25,11 @@ from typing import Any
 
 import httpx
 from pydantic import SecretStr
-from tai_contract.channels import ChannelDelivery, ChannelDeliveryError, ChannelNotification
+from tai42_contract.channels import ChannelDelivery, ChannelDeliveryError, ChannelNotification
 
-from tai_channel_slack.client import slack_http
-from tai_channel_slack.correlation import remaining_seconds, store_correlation
-from tai_channel_slack.settings import SlackSettings, require, require_secret, slack_settings
+from tai42_channel_slack.client import slack_http
+from tai42_channel_slack.correlation import remaining_seconds, store_correlation
+from tai42_channel_slack.settings import SlackSettings, require, require_secret, slack_settings
 
 # Formats answered through the callback door directly (tappable plain link),
 # never as a typed thread reply: ``confirm`` because the door accepts only a
@@ -136,7 +136,7 @@ async def _post_message(token: str, target: str, text: str) -> dict[str, Any]:
 
 
 class SlackChannel:
-    """Registered under ``"slack"``; satisfies ``tai_contract.channels.Channel``."""
+    """Registered under ``"slack"``; satisfies ``tai42_contract.channels.Channel``."""
 
     async def deliver(self, delivery: ChannelDelivery) -> None:
         # Settings are read fresh on every call — never cached on the channel
@@ -176,7 +176,7 @@ class SlackChannel:
         the message text is sent as-is. The recipient is resolved through the
         same allowlist policy as ``deliver``. A plain return means Slack
         ACCEPTED the message (not that a human saw it); any failure raises
-        :class:`~tai_contract.channels.ChannelDeliveryError`. One send attempt,
+        :class:`~tai42_contract.channels.ChannelDeliveryError`. One send attempt,
         no retry. Settings are read fresh on every call, so a rotated bot
         token or a changed recipient policy takes effect on the next
         notification after a settings reset.

@@ -7,11 +7,11 @@ import tomllib
 from pathlib import Path
 
 import yaml
-from tai_contract.plugins import PluginSpec
+from tai42_contract.plugins import PluginSpec
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 _ROOT_SPEC = _REPO_ROOT / "tai-plugin.yml"
-_PACKAGED_SPEC = _REPO_ROOT / "src" / "tai_channel_slack" / "tai-plugin.yml"
+_PACKAGED_SPEC = _REPO_ROOT / "src" / "tai42_channel_slack" / "tai-plugin.yml"
 
 
 def _spec() -> PluginSpec:
@@ -43,8 +43,8 @@ def test_pyproject_ships_the_spec_in_package_data():
     setuptools_cfg = tomllib.loads((_REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8"))["tool"]["setuptools"]
     package_data = setuptools_cfg["package-data"]
     shipping = [key for key, patterns in package_data.items() if "tai-plugin.yml" in patterns]
-    assert shipping == ["tai_channel_slack"], (
-        "tai-plugin.yml must be declared under exactly the tai_channel_slack "
+    assert shipping == ["tai42_channel_slack"], (
+        "tai-plugin.yml must be declared under exactly the tai42_channel_slack "
         "package-data key; a wrong or missing package name would silently omit "
         "the plugin spec from the built wheel"
     )

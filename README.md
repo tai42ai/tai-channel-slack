@@ -1,4 +1,4 @@
-# tai-channel-slack
+# tai42-channel-slack
 
 [![CI](https://github.com/tai42ai/tai-channel-slack/actions/workflows/ci.yml/badge.svg)](https://github.com/tai42ai/tai-channel-slack/actions/workflows/ci.yml)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
@@ -24,9 +24,9 @@ the documentation site covers the platform-level story:
 - Build a channel plugin (author guide): https://tai42.ai/guides/authors/channel
 - Ecosystem catalog: https://tai42.ai/reference/catalog
 
-Its only tai-* dependencies are `tai-contract` (the `Channel` protocol,
-`ChannelDelivery`, `ChannelDeliveryError`, and the `tai_app` handle) and
-`tai-kit[redis]` (`HttpxClient`, `RedisClient`, `TaiBaseSettings`, and the
+Its only tai-* dependencies are `tai42-contract` (the `Channel` protocol,
+`ChannelDelivery`, `ChannelDeliveryError`, and the `tai42_app` handle) and
+`tai42-kit[redis]` (`HttpxClient`, `RedisClient`, `TaiBaseSettings`, and the
 settings cache). Beyond those it depends on `httpx`, `starlette`, and
 `pydantic` / `pydantic-settings` — the whole Slack surface is two HTTPS POSTs
 plus stdlib `hmac`; no `slack_sdk`, no Bolt.
@@ -34,25 +34,25 @@ plus stdlib `hmac`; no `slack_sdk`, no Bolt.
 ## Install
 
 Requires **Python 3.13+**. Nothing is on PyPI yet, so install from source — clone
-this repo alongside your `tai-skeleton` checkout and add it as an editable
+this repo alongside your `tai42-skeleton` checkout and add it as an editable
 dependency of the environment that runs the server:
 
 ```bash
 git clone https://github.com/tai42ai/tai-channel-slack
 cd tai-skeleton   # or your own app checkout
-uv add --editable ../tai-channel-slack   # once published: uv add tai-channel-slack
+uv add --editable ../tai-channel-slack   # once published: uv add tai42-channel-slack
 ```
 
 ## Discovery
 
 The skeleton discovers this plugin through the manifest's `channel_modules`
 field — at app load it imports every module under each named package, and
-`tai_channel_slack.register` registers the `"slack"` channel and the inbound
+`tai42_channel_slack.register` registers the `"slack"` channel and the inbound
 route `POST /api/channels/slack/inbound` as a side-effect. A bare
-`import tai_channel_slack` registers nothing (library use).
+`import tai42_channel_slack` registers nothing (library use).
 
 ```yaml
-channel_modules: [tai_channel_slack]
+channel_modules: [tai42_channel_slack]
 ```
 
 `ask_user(..., channel="slack")` then selects it by name.

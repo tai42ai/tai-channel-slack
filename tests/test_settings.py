@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import pytest
 from pydantic import SecretStr, ValidationError
-from tai_kit.settings import reset_all_settings
+from tai42_kit.settings import reset_all_settings
 
-from tai_channel_slack.settings import (
+from tai42_channel_slack.settings import (
     SlackRedisSettings,
     SlackSettings,
     require,

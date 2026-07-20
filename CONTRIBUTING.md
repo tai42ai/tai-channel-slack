@@ -1,14 +1,14 @@
-# Contributing to tai-channel-slack
+# Contributing to tai42-channel-slack
 
-`tai-channel-slack` is a Slack **channel** plugin for the TAI ecosystem:
+`tai42-channel-slack` is a Slack **channel** plugin for the TAI ecosystem:
 `ask_user(..., channel="slack")` posts the question to a configured Slack channel
 via `chat.postMessage`; the human replies in the message's thread; the Slack
 Events API delivers the reply to this plugin's inbound door, which verifies the
 request signature and forwards the answer to the interaction's public callback
-URL. The hard rule (the plugin rule): **it depends on `tai-contract` + `tai-kit`
+URL. The hard rule (the plugin rule): **it depends on `tai42-contract` + `tai42-kit`
 only and never imports the skeleton** — the whole Slack surface is two HTTPS POSTs
 plus stdlib `hmac` (no `slack_sdk`, no Bolt). The skeleton loads it through the
-manifest's `channel_modules` field; `tai_channel_slack.register` registers the
+manifest's `channel_modules` field; `tai42_channel_slack.register` registers the
 `"slack"` channel and the inbound route as a side-effect — there is no import
 edge to the skeleton in either direction.
 
@@ -17,7 +17,7 @@ edge to the skeleton in either direction.
 - **No skeleton import — ever.** The package is contract-facing; the ban is
   enforced by ruff (`flake8-tidy-imports`), so a stray import fails lint:
   ```bash
-  grep -rn "tai_skeleton" src/   # must be empty
+  grep -rn "tai42_skeleton" src/   # must be empty
   ```
 - **Credentials are operator-bound, never LLM-visible.** The signing secret and
   bot token come from the environment, never from a tool parameter; a requested

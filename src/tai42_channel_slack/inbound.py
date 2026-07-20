@@ -36,11 +36,11 @@ from collections.abc import Mapping
 
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
-from tai_contract.app import tai_app
+from tai42_contract.app import tai42_app
 
-from tai_channel_slack.client import slack_http
-from tai_channel_slack.correlation import claim_dedupe, delete_correlation, get_callback_url, release_dedupe
-from tai_channel_slack.settings import slack_settings
+from tai42_channel_slack.client import slack_http
+from tai42_channel_slack.correlation import claim_dedupe, delete_correlation, get_callback_url, release_dedupe
+from tai42_channel_slack.settings import slack_settings
 
 logger = logging.getLogger(__name__)
 
@@ -128,7 +128,7 @@ def _verify_signature(raw: bytes, headers: Mapping[str, str], secret: str) -> No
         raise _SignatureRejected(f"{_SIGNATURE_HEADER} digest mismatch")
 
 
-@tai_app.http.custom_route(
+@tai42_app.http.custom_route(
     "/api/channels/slack/inbound",
     methods=["POST"],
     summary="Slack Events API inbound door (signature-authenticated)",

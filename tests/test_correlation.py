@@ -5,9 +5,9 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from tai_contract.channels import ChannelDeliveryError
+from tai42_contract.channels import ChannelDeliveryError
 
-from tai_channel_slack.correlation import (
+from tai42_channel_slack.correlation import (
     DEDUPE_TTL_SECONDS,
     claim_dedupe,
     delete_correlation,

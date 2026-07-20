@@ -10,9 +10,9 @@ from typing import Any
 
 import httpx
 import pytest
-from tai_kit.settings import reset_all_settings
+from tai42_kit.settings import reset_all_settings
 
-from tai_channel_slack.inbound import slack_inbound
+from tai42_channel_slack.inbound import slack_inbound
 from tests.conftest import (
     TEST_ALLOWED_RECIPIENT,
     TEST_DEFAULT_RECIPIENT,

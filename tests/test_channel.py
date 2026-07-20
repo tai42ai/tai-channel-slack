@@ -10,11 +10,11 @@ from datetime import UTC, datetime, timedelta
 
 import httpx
 import pytest
-from tai_contract.channels import ChannelDeliveryError, ChannelNotification
-from tai_kit.settings import reset_all_settings
+from tai42_contract.channels import ChannelDeliveryError, ChannelNotification
+from tai42_kit.settings import reset_all_settings
 
-from tai_channel_slack.channel import SlackChannel, _render_text
-from tai_channel_slack.correlation import remaining_seconds
+from tai42_channel_slack.channel import SlackChannel, _render_text
+from tai42_channel_slack.correlation import remaining_seconds
 from tests.conftest import TEST_ALLOWED_RECIPIENT, TEST_BOT_TOKEN, TEST_DEFAULT_RECIPIENT, make_delivery
 
 pytestmark = pytest.mark.usefixtures("slack_env")
