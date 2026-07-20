@@ -1,0 +1,291 @@
+"""Bind a light stub app before the plugin is imported, and provide the shared
+fakes/helpers.
+
+``tai_channel_slack.inbound`` registers its route through
+``@tai_app.http.custom_route`` at import time, ``tai_channel_slack.register``
+registers the channel, and every outbound call reaches its client via
+``tai_app.clients.client_ctx``. Binding a stub app here — at collection time,
+before any test module imports the plugin — satisfies all three without
+standing up the real runtime. Tests wire clients per class: an
+``httpx.AsyncClient`` over a scripted ``MockTransport`` under ``HttpxClient``
+and a :class:`FakeRedis` under ``RedisClient``.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import hmac
+import json
+import time
+from collections.abc import AsyncIterator, Iterator
+from datetime import UTC, datetime, timedelta
+from types import SimpleNamespace
+from typing import Any
+
+import httpx
+import pytest
+from starlette.requests import Request
+from tai_contract.app import tai_app
+from tai_contract.channels import ChannelDelivery
+from tai_kit.clients.impl.http import HttpxClient
+from tai_kit.clients.impl.redis import RedisClient
+from tai_kit.settings import reset_all_settings
+
+TEST_SIGNING_SECRET = "test-signing-secret"
+TEST_BOT_TOKEN = "xoxb-test-token"
+TEST_DEFAULT_RECIPIENT = "C0TESTCHAN"
+TEST_ALLOWED_RECIPIENT = "C0ALLOWED1"
+
+_ENV_VARS = (
+    "CHANNEL_SLACK_BOT_TOKEN",
+    "CHANNEL_SLACK_SIGNING_SECRET",
+    "CHANNEL_SLACK_ALLOWED_RECIPIENTS",
+    "CHANNEL_SLACK_DEFAULT_RECIPIENT",
+    "CHANNEL_SLACK_API_BASE_URL",
+    "CHANNEL_SLACK_REDIS_URL",
+    "CHANNEL_SLACK_HTTP_TIMEOUT_SECONDS",
+)
+
+
+class _ClientCtx:
+    def __init__(self, client: Any) -> None:
+        self._client = client
+
+    async def __aenter__(self) -> Any:
+        return self._client
+
+    async def __aexit__(self, *exc: object) -> bool:
+        return False
+
+
+class _StubClients:
+    """Dispatches ``client_ctx`` on the client class to a test-set instance."""
+
+    def __init__(self) -> None:
+        self.clients: dict[type, Any] = {}
+
+    def client_ctx(self, client_cls: type, settings: Any = None, *, fresh: bool = False, **kwargs: Any) -> _ClientCtx:
+        if client_cls not in self.clients:
+            raise RuntimeError(f"test must set stub client for {client_cls.__name__}")
+        return _ClientCtx(self.clients[client_cls])
+
+
+class _StubChannels:
+    """Records every channel registered through ``tai_app.channels.register``."""
+
+    def __init__(self) -> None:
+        self.registered: dict[str, Any] = {}
+
+    def register(self, name: str, channel: Any) -> None:
+        # A real app raises on a duplicate name; the capture mirrors that so a
+        # double-registration bug surfaces in tests rather than being masked.
+        if name in self.registered:
+            raise ValueError(f"channel {name!r} is already registered")
+        self.registered[name] = channel
+
+
+class _StubHttp:
+    """Records every route registered through ``tai_app.http.custom_route``."""
+
+    def __init__(self) -> None:
+        self.routes: dict[str, SimpleNamespace] = {}
+
+    def custom_route(
+        self,
+        path: str,
+        methods: list[str],
+        name: str | None = None,
+        include_in_schema: bool = True,
+        *,
+        summary: str,
+        tags: list[str],
+        response_model: Any,
+        request_model: Any = None,
+        authed: bool = True,
+    ) -> Any:
+        def decorator(handler: Any) -> Any:
+            self.routes[path] = SimpleNamespace(
+                handler=handler,
+                methods=methods,
+                authed=authed,
+                summary=summary,
+                tags=tags,
+            )
+            return handler
+
+        return decorator
+
+
+class _StubApp:
+    def __init__(self) -> None:
+        self.channels = _StubChannels()
+        self.http = _StubHttp()
+        self.clients = _StubClients()
+
+
+_stub_app = _StubApp()
+# Bind at import time so the first import of any plugin module (its
+# module-level registration side-effects) has an app to register against.
+tai_app.bind(_stub_app)
+
+
+class FakeRedis:
+    """get/set/delete with NX + EX recording — just enough redis for the store."""
+
+    def __init__(self) -> None:
+        self.store: dict[str, str] = {}
+        self.ttls: dict[str, int | None] = {}
+
+    async def set(self, key: str, value: str, ex: int | None = None, nx: bool = False) -> bool | None:
+        if nx and key in self.store:
+            return None
+        self.store[key] = value
+        self.ttls[key] = ex
+        return True
+
+    async def get(self, key: str) -> str | None:
+        return self.store.get(key)
+
+    async def delete(self, key: str) -> int:
+        self.ttls.pop(key, None)
+        return int(self.store.pop(key, None) is not None)
+
+
+class ScriptedHttp:
+    """A ``MockTransport`` script: records every request, pops queued results.
+
+    Queue an ``httpx.Response`` to answer a request or an exception instance to
+    raise it as a transport failure. Running dry is a loud test error, never a
+    silent default response.
+    """
+
+    def __init__(self) -> None:
+        self.requests: list[httpx.Request] = []
+        self.results: list[httpx.Response | Exception] = []
+
+    def handler(self, request: httpx.Request) -> httpx.Response:
+        self.requests.append(request)
+        if not self.results:
+            raise AssertionError(f"no scripted response left for {request.url}")
+        result = self.results.pop(0)
+        if isinstance(result, Exception):
+            raise result
+        return result
+
+
+@pytest.fixture
+def stub_app() -> _StubApp:
+    return _stub_app
+
+
+@pytest.fixture
+def fake_redis() -> Iterator[FakeRedis]:
+    """A :class:`FakeRedis` wired into ``client_ctx`` under ``RedisClient``."""
+    redis = FakeRedis()
+    _stub_app.clients.clients[RedisClient] = redis
+    try:
+        yield redis
+    finally:
+        _stub_app.clients.clients.pop(RedisClient, None)
+
+
+@pytest.fixture
+async def http_script() -> AsyncIterator[ScriptedHttp]:
+    """A scripted ``httpx.AsyncClient`` wired into ``client_ctx`` under
+    ``HttpxClient``; outbound payloads are asserted from ``.requests``."""
+    script = ScriptedHttp()
+    client = httpx.AsyncClient(transport=httpx.MockTransport(script.handler))
+    _stub_app.clients.clients[HttpxClient] = client
+    try:
+        yield script
+    finally:
+        _stub_app.clients.clients.pop(HttpxClient, None)
+        await client.aclose()
+
+
+@pytest.fixture
+def slack_env(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
+    """The ``CHANNEL_SLACK_*`` env vars set (credentials, one allowlisted
+    recipient, a default recipient, the store URL), settings caches reset
+    before and after — cached settings never leak across tests."""
+    monkeypatch.setenv("CHANNEL_SLACK_BOT_TOKEN", TEST_BOT_TOKEN)
+    monkeypatch.setenv("CHANNEL_SLACK_SIGNING_SECRET", TEST_SIGNING_SECRET)
+    monkeypatch.setenv("CHANNEL_SLACK_ALLOWED_RECIPIENTS", TEST_ALLOWED_RECIPIENT)
+    monkeypatch.setenv("CHANNEL_SLACK_DEFAULT_RECIPIENT", TEST_DEFAULT_RECIPIENT)
+    monkeypatch.setenv("CHANNEL_SLACK_REDIS_URL", "redis://correlation-store:6379/0")
+    reset_all_settings()
+    try:
+        yield
+    finally:
+        reset_all_settings()
+
+
+@pytest.fixture
+def no_slack_env(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
+    """No ``CHANNEL_SLACK_*`` env at all, settings caches reset before and
+    after — the unconfigured/fail-closed branches."""
+    for var in _ENV_VARS:
+        monkeypatch.delenv(var, raising=False)
+    reset_all_settings()
+    try:
+        yield
+    finally:
+        reset_all_settings()
+
+
+def make_delivery(
+    answer_format: str = "text",
+    options: list[str] | None = None,
+    timeout_at: datetime | None = None,
+    callback_url: str = "http://gateway/api/interactions/callback/ticket-1",
+    recipient: str | None = None,
+) -> ChannelDelivery:
+    """A valid ``ChannelDelivery`` with a comfortably-future default budget."""
+    return ChannelDelivery(
+        interaction_id="int-1",
+        recipient=recipient,
+        question="Deploy to production?",
+        answer_format=answer_format,
+        options=options,
+        callback_url=callback_url,
+        timeout_at=timeout_at or (datetime.now(UTC) + timedelta(minutes=10)),
+    )
+
+
+def make_request(body: bytes, headers: dict[str, str]) -> Request:
+    """A starlette ``Request`` over a raw ASGI scope carrying ``body`` — drives
+    the captured route handler directly."""
+    scope = {
+        "type": "http",
+        "method": "POST",
+        "path": "/api/channels/slack/inbound",
+        "query_string": b"",
+        "headers": [(k.lower().encode("latin-1"), v.encode("latin-1")) for k, v in headers.items()],
+    }
+    sent = False
+
+    async def receive() -> dict[str, Any]:
+        nonlocal sent
+        if sent:
+            return {"type": "http.request", "body": b"", "more_body": False}
+        sent = True
+        return {"type": "http.request", "body": body, "more_body": False}
+
+    return Request(scope, receive)
+
+
+def body_json(response: Any) -> Any:
+    """The response body decoded as JSON (``Response.body`` may be a memoryview)."""
+    return json.loads(bytes(response.body))
+
+
+def signed_headers(body: bytes, secret: str, timestamp: int | None = None) -> dict[str, str]:
+    """A valid ``X-Slack-Request-Timestamp`` + ``X-Slack-Signature`` pair for
+    ``body`` (defaults to now), so flow tests go through REAL verification."""
+    ts = int(time.time()) if timestamp is None else timestamp
+    base = b"v0:" + str(ts).encode("ascii") + b":" + body
+    digest = hmac.new(secret.encode("utf-8"), base, hashlib.sha256).hexdigest()
+    return {
+        "X-Slack-Request-Timestamp": str(ts),
+        "X-Slack-Signature": f"v0={digest}",
+    }
